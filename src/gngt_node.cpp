@@ -5,9 +5,12 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <dynamic_reconfigure/server.h>
 
 #include <vq2.h>
 #include <opencv2/opencv.hpp>
+
+#include <vqimg/GngtParamConfig.h>
 
 class Params {
 
@@ -52,6 +55,11 @@ public:
   double lowPassCoef(void)   const {return .4;}
   double delta(void)         const {return .75;}
   double margin(void)        const {return .2;}
+
+
+  void on_reconf(vqimg::GngtParamConfig &config, uint32_t level) {
+    thresh = (unsigned char)(config.threshold);
+  }
 };
 
 class Algo {
@@ -95,13 +103,18 @@ class Algo {
   image_transport::ImageTransport it;
   image_transport::Publisher      img_pub;
   image_transport::Subscriber     img_sub;
+  
+  dynamic_reconfigure::Server<vqimg::GngtParamConfig> server;
 
 public:
   Algo()
-    : n(),
+    : params(),
+      n(),
       it(n),
       img_pub(it.advertise("/image_out", 1)),
-      img_sub(it.subscribe("/image_in", 1, boost::bind(&Algo::on_image, boost::ref(*this), _1))) {
+      img_sub(it.subscribe("/image_in", 1, boost::bind(&Algo::on_image, boost::ref(*this), _1))),
+      server() {
+    server.setCallback(boost::bind(&Params::on_reconf, boost::ref(params), _1, _2));
   }
 
 private:
