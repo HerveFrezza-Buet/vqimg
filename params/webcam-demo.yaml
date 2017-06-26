@@ -5,21 +5,21 @@ dictitems:
       groups: !!python/object/new:dynamic_reconfigure.encoding.Config
         state: []
       id: 0
-      max_dist: 0.12
-      max_samples: 1010
+      max_dist: 0.1
+      max_samples: 1500
       name: Default
-      nb_epochs: 1
+      nb_epochs: 10
       parameters: !!python/object/new:dynamic_reconfigure.encoding.Config
         state: []
       parent: 0
       state: true
-      target: 7.0
-      threshold: 127
+      target: 3.0
+      threshold: 100
       type: ''
     state: []
-  max_dist: 0.12
-  max_samples: 1010
-  nb_epochs: 1
-  target: 7.0
-  threshold: 127
+  max_dist: 0.1
+  max_samples: 1500
+  nb_epochs: 10
+  target: 3.0
+  threshold: 100
 state: []
