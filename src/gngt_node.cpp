@@ -1,5 +1,9 @@
 
 
+#include <iterator>
+#include <map>
+#include <algorithm>
+#include <utility>
 
 #include "ros/ros.h"
 #include <image_transport/image_transport.h>
@@ -11,9 +15,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <vqimg/GngtParamConfig.h>
-#include <iterator>
-#include <map>
-#include <algorithm>
+#include <vqimg/component_centers.h>
 
 class Params {
 
@@ -92,15 +94,28 @@ class Algo {
   class LabelToColor {
   private:
 
-    std::map<unsigned int, cv::Scalar> colormap;
+    std::map<unsigned int, std::pair<cv::Scalar, bool> > colormap;
     
   public:
     
     LabelToColor() {}
+    
+    void check_usage() {
+      std::map<unsigned int, std::pair<cv::Scalar, bool> > newmap;
+
+      for(auto& kv : colormap)
+	if(kv.second.second)
+	  newmap[kv.first] = {kv.second.first, false};
+
+      colormap = std::move(newmap);
+    }
+    
     cv::Scalar operator()(unsigned int label) {
       auto iter = colormap.find(label);
-      if(iter != colormap.end())
-	return iter->second;
+      if(iter != colormap.end()) {
+	iter->second.second = true;
+	return iter->second.first;
+      }
       else {
 	double r = vq2::proba::random::uniform(0,255);
 	double g = vq2::proba::random::uniform(0,255);
@@ -111,7 +126,7 @@ class Algo {
 	double coef = 255.0/(max-min);
 
 	cv::Scalar color((r-min)*coef, (g-min)*coef, (b-min)*coef);
-	colormap[label] = color;
+	colormap[label] = {color, true};
 	return color;
       }
     }
@@ -151,6 +166,7 @@ class Algo {
   image_transport::ImageTransport it;
   image_transport::Publisher      img_pub;
   image_transport::Subscriber     img_sub;
+  ros::Publisher                  centers_pub;
   
   dynamic_reconfigure::Server<vqimg::GngtParamConfig> server;
   
@@ -182,6 +198,8 @@ class Algo {
 
   LabelToColor l2c;
 
+  vqimg::component_centers centers_msg;
+
 public:
   Algo()
     : params(),
@@ -189,6 +207,7 @@ public:
       it(n),
       img_pub(it.advertise("/image_out", 1)),
       img_sub(it.subscribe("/image_in", 1, boost::bind(&Algo::on_image, boost::ref(*this), _1))),
+      centers_pub(n.advertise<vqimg::component_centers>("/component_centers",1)),
       server(),
       g(),
       distance(),
@@ -210,6 +229,27 @@ private:
     return cv::Point2i((int)((in.x+.5)*cols+.5), (int)(-in.y*cols + rows_2+.5));
   }
 
+
+  friend class Barycenter;
+  class Barycenter {
+  private:
+    cv::Point2d G;
+    double n;
+  public:
+    Barycenter() : G(0,0), n(0) {}
+    bool operator()(Graph::vertex_type& v) {
+      n += 1;
+      auto& p = v.value.prototype();
+      G.x += p.x;
+      G.y += p.y;
+      return false;
+    }
+
+    cv::Point2d operator()() {
+      return cv::Point2d(G.x/n,G.y/n);
+    }
+  };
+  
   friend class DrawVertex;
   class DrawVertex {
   public:
@@ -257,10 +297,17 @@ private:
     }
   };
 
-  
+  void plot_centers(cv::Mat& output, int rows_2, int cols) {
+    for(auto& center : centers_msg.data)
+      cv::circle(output, gngt2cv( cv::Point2d(center.x, center.y), rows_2, cols), 10, cv::Scalar(255, 255,0), -1);
+  }
   
   void on_image(const sensor_msgs::ImageConstPtr& msg) {
     bool display = img_pub.getNumSubscribers() > 0;
+    bool centers = centers_pub.getNumSubscribers() > 0;
+
+    if(!centers && !display)
+      return;
 
     cv_bridge::CvImageConstPtr bridge_input;
     try {
@@ -319,11 +366,30 @@ private:
     InvalidateLongEdge ile(params.max_dist);
     g.for_each_edge(ile);
     std::map<unsigned int,Graph::Component*> components;
-    g.computeConnectedComponents(components, true); 
+    g.computeConnectedComponents(components, true);
 
+    centers_msg.data.clear();
+    
+    if(centers) {
+      auto ctrs_out = std::back_inserter(centers_msg.data);
+      for(auto& kv : components) {
+	Barycenter b;
+	kv.second->for_each_vertex(b);
+	auto G = b();
+	vqimg::component_center cc;
+	cc.label = (vqimg::component_center::_label_type)(kv.first);
+	cc.x     = G.x;
+	cc.y     = G.y;
+	*(ctrs_out) = cc;
+      }
+
+      centers_pub.publish(centers_msg);
+    }
+    
     
 
     if(display) {
+      l2c.check_usage();
       DrawVertex dw(output, rows_2, input.cols);
       DrawEdge de(output, rows_2, input.cols);
       for(auto& kv : components) {
@@ -332,6 +398,7 @@ private:
 	kv.second->for_each_edge(de);
 	kv.second->for_each_vertex(dw);
       }
+      plot_centers(output, rows_2, input.cols);
       img_pub.publish(cv_bridge::CvImage(msg->header, "rgb8", output).toImageMsg());
     }
   }

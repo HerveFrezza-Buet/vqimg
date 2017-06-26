@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+
+  <node name="video"    pkg="usb_cam"    type="usb_cam_node" respawn="true">
+    <param name="video_device" value="/dev/video0" />
+    <param name="pixel_format" value="yuyv" />
+  </node>
+  
+  <node name="gngt" pkg="vqimg" type="gngt_node">
+    <remap from="image_in" to="/video/image_raw"/>
+  </node>
+
+  <node name="view" pkg="image_view" type="image_view">
+    <remap from="image" to="image_out"/>
+  </node>
+  
+  <node name="reconf" pkg="rqt_reconfigure" type="rqt_reconfigure"/>
+  
+  <node name="gngt_param" pkg="dynamic_reconfigure" type="dynparam" args="load /gngt $(find vqimg)/params/webcam-demo.yaml"/>
+
+      
+</launch>

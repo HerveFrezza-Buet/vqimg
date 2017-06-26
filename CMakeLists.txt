@@ -8,14 +8,31 @@ find_package(PkgConfig)
 pkg_check_modules(VQ2 vq2 REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS 
-  roscpp rospy std_msgs genmsg image_transport 
-  cv_bridge sensor_msgs dynamic_reconfigure)
+  roscpp
+  rospy
+  std_msgs
+  image_transport 
+  cv_bridge
+  dynamic_reconfigure
+  message_generation)
 
 
 
 generate_dynamic_reconfigure_options(
   cfg/gngt.cfg
-)
+  )
+
+
+add_message_files(
+  FILES
+  component_center.msg
+  component_centers.msg
+  )
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  )
 
 catkin_package(
   CATKIN_DEPENDS 
@@ -23,7 +40,8 @@ catkin_package(
   std_msgs
   image_transport
   cv_bridge
-)
+  message_runtime
+  )
 
 
 ###########
