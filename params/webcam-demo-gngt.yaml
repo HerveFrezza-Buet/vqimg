@@ -14,12 +14,12 @@ dictitems:
       parent: 0
       state: true
       target: 3.0
-      threshold: 100
+      threshold: 230
       type: ''
     state: []
   max_dist: 0.1
   max_samples: 1500
   nb_epochs: 10
   target: 3.0
-  threshold: 100
+  threshold: 230
 state: []

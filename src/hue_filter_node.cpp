@@ -17,7 +17,7 @@
 #define HSV_LINE_THICKNESS      20
 #define HSV_LINE_CURSOR_RADIUS   1
 #define REMAINING_INTENSITY_DISPLAY_RATIO .1
-#define HUE_DIFF_FACTOR 3
+#define HUE_DIFF_FACTOR 5
 
 class Params {
 
@@ -99,8 +99,8 @@ private:
     return 255 - HUE_DIFF_FACTOR*diff;
   }
 
-  #define SIGM_THRES_1 .99
-  #define SIGM_THRES_2 .9
+  #define SIGM_THRES_1 .95
+  #define SIGM_THRES_2 .7
   static double display_sigmoid(double x) {
     if(x > SIGM_THRES_1)
       return 1;
