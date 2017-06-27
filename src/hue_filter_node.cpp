@@ -16,6 +16,7 @@
 
 #define HSV_LINE_THICKNESS      20
 #define HSV_LINE_CURSOR_RADIUS   1
+#define REMAINING_INTENSITY_DISPLAY_RATIO .2
 
 class Params {
 
@@ -80,6 +81,17 @@ private:
     }
     cv::cvtColor(hsv_line, hsv_line, CV_HSV2BGR);
   }
+
+  static unsigned char apply_filter(unsigned char* hsv, unsigned char hue, unsigned char min_sat, unsigned char min_val) {
+    if(hsv[1] < min_sat || hsv[2] < min_val)
+      return 0;
+    unsigned char diff;
+    if(hue > *hsv)
+      diff = hue - *hsv;
+    else
+      diff = *hsv - hue;
+    return 255 - diff;
+  }
   
   void on_image(const sensor_msgs::ImageConstPtr& msg) {
     bool display = img_pub.getNumSubscribers() > 0;
@@ -100,30 +112,56 @@ private:
     
     const cv::Mat& input = bridge_input->image;
     unsigned char* iit   = input.data;
+    unsigned int stride = input.cols*3;
+    unsigned int size   = input.rows*stride;
     
     cv::Mat output;
-    cv::Mat filtered;
     unsigned char* dit;
-    unsigned char* fit;
     
     if(display) {
       output.create(input.rows, input.cols, CV_8UC3);
       dit  = output.data;
       check_line(input.cols);
     }
-    if(filter) {
-      filtered.create(input.rows, input.cols, CV_8UC1);
-      dit  = filtered.data;
-    }
+
+    cv::Mat filtered;
+    filtered.create(input.rows, input.cols, CV_8UC1);
+    unsigned char* fit = filtered.data;
     
+    cv::Mat hsv;
+    cv::cvtColor(input, hsv, CV_HSV2BGR);
+    
+    unsigned char* f    = fit;
+    unsigned char* hit  = hsv.data;
+    unsigned char* hend = hsv.data + size;
+    unsigned char min_sat = (unsigned char)(255*params.min_sat + .5);
+    unsigned char min_val = (unsigned char)(255*params.min_val + .5);
+    unsigned char hue     = (unsigned char)(180*params.hue     + .5);
+    for(; hit != hend; hit += 3)
+      *(f++) = apply_filter(hit, hue, min_sat, min_val);
+      
+    
+    if(filter)
+      filter_pub.publish(cv_bridge::CvImage(msg->header, "mono8", filtered).toImageMsg());
 
     if(display) {
+      std::copy(iit, iit + size, dit);
 
-      std::copy(iit, iit + input.rows*input.cols*3, dit);
-      
       unsigned char* ddit = dit;
+      unsigned char* dend = dit + size;
+      unsigned char* f    = fit;
+      double coef = (1-REMAINING_INTENSITY_DISPLAY_RATIO)/255.0;
+
+      while(ddit != dend) {
+	double ratio  = *(f++)*coef + REMAINING_INTENSITY_DISPLAY_RATIO;
+	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
+	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
+	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
+      }
+      
+      
+      ddit = dit;
       unsigned thick_limit = std::min(input.rows, HSV_LINE_THICKNESS);
-      unsigned int stride = input.cols*3;
       for(unsigned int thick = 0; thick < thick_limit; ++thick, ddit += stride)
 	 std::copy(hsv_line.data, hsv_line.data + stride, ddit);
 
@@ -131,7 +169,7 @@ private:
       int pos_max = pos_min+2*HSV_LINE_CURSOR_RADIUS;
       cv::rectangle(output, cv::Point(pos_min, 0), cv::Point(pos_max, HSV_LINE_THICKNESS), cv::Scalar(0,0,0), -1);
       
-      img_pub.publish(cv_bridge::CvImage(msg->header, "rgb8", output).toImageMsg());
+      img_pub.publish(cv_bridge::CvImage(msg->header, "bgr8", output).toImageMsg());
     }
   }
 };
