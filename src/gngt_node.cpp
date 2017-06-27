@@ -17,6 +17,9 @@
 #include <vqimg/GngtParamConfig.h>
 #include <vqimg/component_centers.h>
 
+
+enum class EvolutionType : char {A = 'a', B = 'b'};
+
 class Params {
 
 public:
@@ -35,6 +38,8 @@ public:
   unsigned int img_size = 0;
 
   double max_dist = .1;
+
+  EvolutionType etype = EvolutionType::A;
 
 public:
 
@@ -79,6 +84,15 @@ public:
     t = config.target;
     max_samples = (unsigned int)(config.max_samples);
     max_dist = config.max_dist;
+    switch(config.evolution_algo) {
+    case 0 : etype = EvolutionType::B; break;
+    case 1 : etype = EvolutionType::A; break;
+    default:                           break;
+    }
+    if(config.evolution_algo == 0)
+      etype = EvolutionType::B;
+    else if(config.evolution_algo == 1)
+      etype = EvolutionType::A;
   }
 };
 
@@ -89,7 +103,40 @@ class Algo {
   typedef Graph::edge_type                                Edge;
   typedef Graph::ref_vertex_type                          RefVertex;
   typedef Graph::ref_edge_type                            RefEdge;
-  typedef vq2::by_default::gngt::Evolution<Params>        Evolution;
+
+  typedef vq2::by_default::gngt::Evolution<Params>        EvolutionA;
+  
+  class EvolutionB {
+  private:
+
+    double sum;
+    int n;
+    const Params& params;
+    
+  public:
+
+    EvolutionB(const Params& params) : params(params) {}
+        
+    void clear(void) {
+      sum = 0;
+      n = 0;
+    }
+    
+    void operator+=(double value) {
+      sum += value;
+      ++n;
+    }
+    
+    int operator()() {
+      if(n == 0)
+	return 0;
+      if(params.target()*params.nbSamples() > sum/n)
+	return -1;
+      return 1;
+    }
+    
+  };
+    
 
   class LabelToColor {
   private:
@@ -175,7 +222,8 @@ class Algo {
   UnitSimilarity   unit_distance;
   Learn            learn;
   UnitLearn        unit_learn;
-  Evolution        evolution;
+  EvolutionA       evolution_a;
+  EvolutionB       evolution_b;
 
   std::vector<cv::Point2d> samples;
 
@@ -214,7 +262,8 @@ public:
       unit_distance(distance),
       learn(),
       unit_learn(learn),
-      evolution(params),
+      evolution_a(params),
+      evolution_b(params),
       l2c() {
     server.setCallback(boost::bind(&Params::on_reconf, boost::ref(params), _1, _2));
   }
@@ -360,11 +409,25 @@ private:
 	    *(out++) = cv2gngt(xi, rows_2, coef);
 
     ReshuffleSamples reshuffler(samples, params.update_nb_samples(samples.size()));
-    vq2::algo::gngt::epoch(params,g,
-                           unit_distance,unit_learn,
-                           evolution,reshuffler,
-                           [] (const cv::Point2d& p) -> const cv::Point2d& {return p;},
-                           params.nb_epochs);
+
+    switch(params.etype) {
+    case EvolutionType::A:
+      vq2::algo::gngt::epoch(params,g,
+			     unit_distance,unit_learn,
+			     evolution_a,reshuffler,
+			     [] (const cv::Point2d& p) -> const cv::Point2d& {return p;},
+			     params.nb_epochs);
+      break;
+    case EvolutionType::B:
+      vq2::algo::gngt::epoch(params,g,
+			     unit_distance,unit_learn,
+			     evolution_b,reshuffler,
+			     [] (const cv::Point2d& p) -> const cv::Point2d& {return p;},
+			     params.nb_epochs);
+      break;
+    default:
+      break;
+    }
     
     InvalidateLongEdge ile(params.max_dist);
     g.for_each_edge(ile);
