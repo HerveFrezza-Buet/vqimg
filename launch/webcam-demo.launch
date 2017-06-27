@@ -23,6 +23,10 @@
     <remap from="image" to="image_out"/>
   </node>
   
+  <node name="view_filtered" pkg="image_view" type="image_view">
+    <remap from="image" to="filter_out"/>
+  </node>
+  
   <node name="reconf" pkg="rqt_reconfigure" type="rqt_reconfigure"/>
   
   <node name="gngt_param" pkg="dynamic_reconfigure" type="dynparam" args="load /gngt $(find vqimg)/params/webcam-demo-gngt.yaml"/>
