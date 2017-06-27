@@ -7,16 +7,26 @@
   </node>
   
   <node name="gngt" pkg="vqimg" type="gngt_node">
+    <remap from="image_in" to="filter_out"/>
+  </node> 
+  
+  <node name="hue" pkg="vqimg" type="hue_filter_node">
     <remap from="image_in" to="/video/image_raw"/>
+    <remap from="image_out" to="hue"/>
   </node>
 
-  <node name="view" pkg="image_view" type="image_view">
+  <node name="view_hue" pkg="image_view" type="image_view">
+    <remap from="image" to="hue"/>
+  </node>
+  
+  <node name="view_gng" pkg="image_view" type="image_view">
     <remap from="image" to="image_out"/>
   </node>
   
   <node name="reconf" pkg="rqt_reconfigure" type="rqt_reconfigure"/>
   
-  <node name="gngt_param" pkg="dynamic_reconfigure" type="dynparam" args="load /gngt $(find vqimg)/params/webcam-demo.yaml"/>
+  <node name="gngt_param" pkg="dynamic_reconfigure" type="dynparam" args="load /gngt $(find vqimg)/params/webcam-demo-gngt.yaml"/>
+  <node name="hue_param" pkg="dynamic_reconfigure" type="dynparam" args="load /hue $(find vqimg)/params/webcam-demo-hue.yaml"/>
 
       
 </launch>

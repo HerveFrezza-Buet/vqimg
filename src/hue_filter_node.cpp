@@ -16,7 +16,8 @@
 
 #define HSV_LINE_THICKNESS      20
 #define HSV_LINE_CURSOR_RADIUS   1
-#define REMAINING_INTENSITY_DISPLAY_RATIO .2
+#define REMAINING_INTENSITY_DISPLAY_RATIO .1
+#define HUE_DIFF_FACTOR 3
 
 class Params {
 
@@ -83,6 +84,7 @@ private:
   }
 
   static unsigned char apply_filter(unsigned char* hsv, unsigned char hue, unsigned char min_sat, unsigned char min_val) {
+   
     if(hsv[1] < min_sat || hsv[2] < min_val)
       return 0;
     unsigned char diff;
@@ -90,7 +92,21 @@ private:
       diff = hue - *hsv;
     else
       diff = *hsv - hue;
-    return 255 - diff;
+
+    if(diff > 255/HUE_DIFF_FACTOR)
+      return 0;
+    
+    return 255 - HUE_DIFF_FACTOR*diff;
+  }
+
+  #define SIGM_THRES_1 .99
+  #define SIGM_THRES_2 .9
+  static double display_sigmoid(double x) {
+    if(x > SIGM_THRES_1)
+      return 1;
+    if(x > SIGM_THRES_2)
+      return (x-SIGM_THRES_2)/(SIGM_THRES_1-SIGM_THRES_2);
+    return 0;
   }
   
   void on_image(const sensor_msgs::ImageConstPtr& msg) {
@@ -129,7 +145,7 @@ private:
     unsigned char* fit = filtered.data;
     
     cv::Mat hsv;
-    cv::cvtColor(input, hsv, CV_HSV2BGR);
+    cv::cvtColor(input, hsv, CV_BGR2HSV);
     
     unsigned char* f    = fit;
     unsigned char* hit  = hsv.data;
@@ -150,10 +166,10 @@ private:
       unsigned char* ddit = dit;
       unsigned char* dend = dit + size;
       unsigned char* f    = fit;
-      double coef = (1-REMAINING_INTENSITY_DISPLAY_RATIO)/255.0;
+      double coef = 1/255.0;
 
       while(ddit != dend) {
-	double ratio  = *(f++)*coef + REMAINING_INTENSITY_DISPLAY_RATIO;
+	double ratio  = display_sigmoid(*(f++)*coef)*(1-REMAINING_INTENSITY_DISPLAY_RATIO) + REMAINING_INTENSITY_DISPLAY_RATIO;
 	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
 	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
 	*ddit = (unsigned char)(*ddit * ratio); ++ddit;
