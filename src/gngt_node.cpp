@@ -234,9 +234,12 @@ private:
   class Barycenter {
   private:
     cv::Point2d G;
-    double n;
+    int n;
   public:
     Barycenter() : G(0,0), n(0) {}
+
+    int nb_samples() {return n;}
+    
     bool operator()(Graph::vertex_type& v) {
       n += 1;
       auto& p = v.value.prototype();
@@ -299,7 +302,7 @@ private:
 
   void plot_centers(cv::Mat& output, int rows_2, int cols) {
     for(auto& center : centers_msg.data)
-      cv::circle(output, gngt2cv( cv::Point2d(center.x, center.y), rows_2, cols), 10, cv::Scalar(255, 255,0), -1);
+      cv::circle(output, gngt2cv( cv::Point2d(center.x, center.y), rows_2, cols), 5+center.nb_vertex, cv::Scalar(255, 255,0), -1);
   }
   
   void on_image(const sensor_msgs::ImageConstPtr& msg) {
@@ -377,9 +380,10 @@ private:
 	kv.second->for_each_vertex(b);
 	auto G = b();
 	vqimg::component_center cc;
-	cc.label = (vqimg::component_center::_label_type)(kv.first);
-	cc.x     = G.x;
-	cc.y     = G.y;
+	cc.label     = (vqimg::component_center::_label_type)(kv.first);
+	cc.nb_vertex = (vqimg::component_center::_label_type)(b.nb_samples());
+	cc.x         = G.x;
+	cc.y         = G.y;
 	*(ctrs_out) = cc;
       }
 
