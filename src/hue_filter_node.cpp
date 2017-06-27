@@ -57,9 +57,9 @@ public:
     : params(),
       n(),
       it(n),
-      img_pub(it.advertise("/image_out", 1)),
-      filter_pub(it.advertise("/filter_out", 1)),
-      img_sub(it.subscribe("/image_in", 1, boost::bind(&Algo::on_image, boost::ref(*this), _1))),
+      img_pub(it.advertise("image_out", 1)),
+      filter_pub(it.advertise("filter_out", 1)),
+      img_sub(it.subscribe("image_in", 1, boost::bind(&Algo::on_image, boost::ref(*this), _1))),
       server() {
     server.setCallback(boost::bind(&Params::on_reconf, boost::ref(params), _1, _2));
   }
