@@ -14,6 +14,9 @@
 
 #include <vqimg/HueParamConfig.h>
 
+#define HSV_LINE_THICKNESS      20
+#define HSV_LINE_CURSOR_RADIUS   1
+
 class Params {
 
 public:
@@ -44,6 +47,9 @@ class Algo {
   
   dynamic_reconfigure::Server<vqimg::HueParamConfig> server;
 
+  cv::Mat hsv_line;
+  
+
 public:
   Algo()
     : params(),
@@ -58,6 +64,22 @@ public:
 
 private:
 
+  void check_line(int cols) {
+    if(cols == hsv_line.cols)
+      return;
+
+    hsv_line.create(1, cols, CV_8UC3);
+
+    unsigned char* it  = hsv_line.data;
+    unsigned char* end = hsv_line.data + 3*cols;
+    int col = 0;
+    while(it != end) {
+      *(it++) = (unsigned char)(180.0*(col++)/(cols-1)+.5); // H
+      *(it++) = 255;                                        // S
+      *(it++) = 255;                                        // V
+    }
+    cv::cvtColor(hsv_line, hsv_line, CV_HSV2BGR);
+  }
   
   void on_image(const sensor_msgs::ImageConstPtr& msg) {
     bool display = img_pub.getNumSubscribers() > 0;
@@ -68,7 +90,7 @@ private:
 
     cv_bridge::CvImageConstPtr bridge_input;
     try {
-      bridge_input = cv_bridge::toCvShare(msg,sensor_msgs::image_encodings::RGB8);
+      bridge_input = cv_bridge::toCvShare(msg,sensor_msgs::image_encodings::BGR8);
     }
     catch (cv::Exception& e) {
       std::ostringstream errstr;
@@ -87,6 +109,7 @@ private:
     if(display) {
       output.create(input.rows, input.cols, CV_8UC3);
       dit  = output.data;
+      check_line(input.cols);
     }
     if(filter) {
       filtered.create(input.rows, input.cols, CV_8UC1);
@@ -97,6 +120,17 @@ private:
     if(display) {
 
       std::copy(iit, iit + input.rows*input.cols*3, dit);
+      
+      unsigned char* ddit = dit;
+      unsigned thick_limit = std::min(input.rows, HSV_LINE_THICKNESS);
+      unsigned int stride = input.cols*3;
+      for(unsigned int thick = 0; thick < thick_limit; ++thick, ddit += stride)
+	 std::copy(hsv_line.data, hsv_line.data + stride, ddit);
+
+      int pos_min = (int)(params.hue*(input.cols-1)+.5)-HSV_LINE_CURSOR_RADIUS;
+      int pos_max = pos_min+2*HSV_LINE_CURSOR_RADIUS;
+      cv::rectangle(output, cv::Point(pos_min, 0), cv::Point(pos_max, HSV_LINE_THICKNESS), cv::Scalar(0,0,0), -1);
+      
       img_pub.publish(cv_bridge::CvImage(msg->header, "rgb8", output).toImageMsg());
     }
   }
