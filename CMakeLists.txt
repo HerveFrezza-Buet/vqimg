@@ -62,9 +62,12 @@ target_link_libraries       (gngt_node        ${VQ2_LIBRARIES}   )
 target_compile_options      (gngt_node PUBLIC -O3                )
 target_compile_options      (gngt_node PUBLIC ${VQ2_CFLAGS_OTHER})
 target_include_directories  (gngt_node PUBLIC ${VQ2_INCLUDE_DIRS})
-add_dependencies            (gngt_node vqimg_gencfg              )
+add_dependencies            (gngt_node vqimg_gencfg)
+add_dependencies            (gngt_node vqimg_generate_messages_cpp)
 
 add_executable              (hue_filter_node src/hue_filter_node.cpp)
 target_link_libraries       (hue_filter_node ${catkin_LIBRARIES}    )
 target_compile_options      (hue_filter_node PUBLIC -O3 -std=c++11  )
 add_dependencies            (hue_filter_node vqimg_gencfg           )
+add_dependencies            (hue_filter_node vqimg_generate_messages_cpp)
+
